@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base ─────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    @apply bg-zinc-950 text-white antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-zinc-950;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-zinc-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-zinc-600;
+  }
+}
+
+/* ── Components ───────────────────────────────────────────── */
+@layer components {
+  /* Dot-grid texture background */
+  .bg-dot-grid {
+    background-image: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px
+    );
+    background-size: 28px 28px;
+  }
+
+  /* Glass card base */
+  .card {
+    @apply bg-zinc-900/70 border border-zinc-800/70 rounded-xl;
+    @apply transition-all duration-300;
+  }
+
+  .card:hover:not(.card--disabled) {
+    @apply border-zinc-700/80 bg-zinc-900;
+  }
+
+  .card--disabled {
+    @apply opacity-55;
+  }
+
+  /* Monospace data label */
+  .data-label {
+    @apply text-zinc-600 text-[10px] uppercase tracking-widest font-medium;
+  }
+
+  /* Monospace data value */
+  .data-value {
+    @apply text-zinc-200 text-sm font-mono font-semibold;
+  }
+}
