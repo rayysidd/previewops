@@ -44,5 +44,19 @@ pipeline {
                 }
             }
         }
+        stage('Garbage Collection') {
+            steps {
+                script {
+                    // Calculate the previous build number
+                    def PREV_BUILD = env.BUILD_NUMBER.toInteger() - 1
+                    def OLD_NAMESPACE = "preview-env-${PREV_BUILD}"
+                    
+                    echo "🧹 Sweeping old environment: ${OLD_NAMESPACE}"
+                    
+                    // Delete the old namespace (ignore errors if it's already gone)
+                    sh "kubectl delete namespace ${OLD_NAMESPACE} --ignore-not-found=true"
+                }
+            }
+        }
     }
 }
