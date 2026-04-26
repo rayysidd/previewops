@@ -25,7 +25,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/ .
 
 # Expose the port your backend runs on (usually 5000 or 8080)
-EXPOSE 5000
+EXPOSE 3000
 
 # Start the application
 CMD ["npm", "start"]
