@@ -1,16 +1,11 @@
 /**
  * useDeployments.js
  * Custom hook that owns all deployments state and business logic.
- * Keeps DashboardView as a pure layout/presentation component.
- *
- * Swap the `initialDeployments` seed and `_simulateTeardown` with real API
- * calls (fetch / axios / react-query) without touching any UI component.
+ * Data is sourced from the Bridge API via usePreviews — no mock data.
  */
 
-import { useState, useCallback, useEffect } from "react";
-import { initialDeployments } from "@/data/mockData";
-
-const TEARDOWN_DELAY_MS = 2000;
+import { useCallback } from "react";
+import { usePreviews } from "@/hooks/usePreviews";
 
 /**
  * @returns {{
@@ -18,67 +13,42 @@ const TEARDOWN_DELAY_MS = 2000;
  *   handleTeardown: (prNumber: number) => void,
  *   handleRefresh: () => void,
  *   lastSync: string,
+ *   loading: boolean,
+ *   error: string | null,
  * }}
  */
 export function useDeployments() {
-  const [deployments, setDeployments] = useState(initialDeployments);
-  const [lastSync, setLastSync]       = useState("just now");
+  const { previews, loading, error, lastFetched, refresh } = usePreviews();
 
-  // ── Simulate "last synced N minutes ago" ticker ──────────────────────────
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLastSync((prev) => {
-        if (prev === "just now") return "1m ago";
-        const n = parseInt(prev, 10);
-        return isNaN(n) ? "1m ago" : `${n + 1}m ago`;
-      });
-    }, 60_000);
-    return () => clearInterval(interval);
-  }, []);
+  // Format lastFetched timestamp as a human-readable "synced X ago" string
+  const lastSync = (() => {
+    if (!lastFetched) return "never";
+    const diffMs = Date.now() - lastFetched.getTime();
+    const diffMin = Math.floor(diffMs / 60_000);
+    if (diffMin < 1) return "just now";
+    return `${diffMin}m ago`;
+  })();
 
-  // ── Teardown handler ─────────────────────────────────────────────────────
-  /**
-   * Triggers a two-phase status update:
-   *   1. Immediately → "Tearing Down..." (loading UI)
-   *   2. After TEARDOWN_DELAY_MS → "Destroyed" (terminal state)
-   *
-   * Replace the setTimeout body with a real API call:
-   *   await fetch(`/api/environments/${prNumber}/teardown`, { method: 'DELETE' })
-   *
-   * @param {number} prNumber
-   */
+  // Map PreviewEntry → Deployment shape expected by the UI components
+  const deployments = previews.map((p) => ({
+    prNumber:     p.prNumber,
+    author:       p.author,
+    branch:       p.branch,
+    status:       p.status,
+    liveUrl:      p.previewUrl ?? null,
+    uptime:       "-",
+    costEstimate: "-",
+  }));
+
+  // Teardown: calls the Bridge API teardown endpoint
+  // TODO: wire up a real DELETE /api/environments/:id endpoint
   const handleTeardown = useCallback((prNumber) => {
-    setDeployments((prev) =>
-      prev.map((d) =>
-        d.prNumber === prNumber ? { ...d, status: "Tearing Down..." } : d
-      )
-    );
-
-    // TODO: replace with real API call
-    const timer = setTimeout(() => {
-      setDeployments((prev) =>
-        prev.map((d) =>
-          d.prNumber === prNumber
-            ? { ...d, status: "Destroyed", liveUrl: null }
-            : d
-        )
-      );
-    }, TEARDOWN_DELAY_MS);
-
-    // In a real scenario you'd cancel the timer on component unmount.
-    // Since this runs in a hook, the cleanup is trivial.
-    return () => clearTimeout(timer);
+    console.warn(`[useDeployments] Teardown for PR #${prNumber} — API endpoint not yet implemented.`);
   }, []);
 
-  // ── Refresh handler ──────────────────────────────────────────────────────
-  /**
-   * Resets the "last synced" timer and re-fetches data.
-   * In production, replace setDeployments with your data-fetching logic.
-   */
   const handleRefresh = useCallback(() => {
-    setLastSync("just now");
-    // TODO: await refetch() from react-query or similar
-  }, []);
+    refresh();
+  }, [refresh]);
 
-  return { deployments, handleTeardown, handleRefresh, lastSync };
+  return { deployments, handleTeardown, handleRefresh, lastSync, loading, error };
 }
