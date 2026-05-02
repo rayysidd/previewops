@@ -38,6 +38,28 @@ app.get('/api/health', (_req, res) => {
 });
 
 /**
+ * GET /api/debug
+ * Shows raw K8s namespaces and GitHub PRs — use this to diagnose missing PR cards.
+ */
+app.get('/api/debug', async (_req, res) => {
+  try {
+    const [namespaces, { byHead, byBase }] = await Promise.all([
+      listPreviewNamespaces(),
+      fetchOpenPRs(),
+    ]);
+    res.json({
+      k8s_namespaces: namespaces,
+      github_prs_by_head: Object.fromEntries(byHead),
+      github_prs_by_base: Object.fromEntries(
+        [...byBase.entries()].map(([k, v]) => [k, v])
+      ),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/previews
  * Returns all active preview environments enriched with optional GitHub PR data.
  */
