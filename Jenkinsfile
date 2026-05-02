@@ -4,7 +4,9 @@ pipeline {
         AWS_ACCOUNT_ID = '885232248552' // Find this in the top right of AWS Console
         AWS_REGION     = 'eu-north-1'
         ECR_REPO_NAME  = 'previewops-backend' // The name of the repo you created earlier
-        NAMESPACE      = "preview-env-${env.BRANCH_NAME}"
+
+        CLEAN_ID       = "${env.BRANCH_NAME.toLowerCase().replaceAll(' ', '-')}"
+        NAMESPACE      = "preview-env-${CLEAN_ID}"
     }
     stages {
         stage('Build Frontend') {
