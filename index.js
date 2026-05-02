@@ -49,49 +49,47 @@ app.get('/api/previews', async (_req, res) => {
       fetchOpenPRs(),
     ]);
 
-    // Create a set of all branches we know about
+    // K8s namespaces are the source of truth.
+    // Only show environments that have an active namespace — this ensures
+    // merged/closed PRs whose namespace has been deleted are removed from the UI.
     const nsMap = new Map(namespaces.map(ns => [ns.branch, ns]));
-    const allBranches = new Set([...nsMap.keys(), ...prMap.keys()]);
 
     const entries = await Promise.all(
-      Array.from(allBranches).map(async (branch) => {
+      Array.from(nsMap.keys()).map(async (branch) => {
         const ns = nsMap.get(branch);
         const gh = prMap.get(branch);
-        
-        // If we have a namespace, get its status. Otherwise, it's "Pending" or "Destroyed"
-        let status = 'Pending';
-        if (ns) {
-          status = await getNamespaceStatus(ns.namespace);
-        } else if (gh) {
-          status = 'Pending'; // PR exists but no K8s namespace yet
-        }
 
-        // Preview URL matches the Ingress host pattern: defaults to env-{branch}.previewops.local
+        const status = await getNamespaceStatus(ns.namespace);
+
+        // Preview URL matches the Ingress host pattern
         const template   = process.env.PREVIEW_URL_TEMPLATE || 'http://env-{branch}.previewops.local';
         const previewUrl = template.replace('{branch}', branch);
 
         return {
-          prNumber:   gh?.prNumber  ?? null,
-          title:      gh?.title     ?? `Branch: ${branch}`,
-          displayName: gh?.title    ?? `Internal Environment: ${branch}`,
+          prNumber:    gh?.prNumber  ?? null,
+          title:       gh?.title     ?? `Branch: ${branch}`,
+          displayName: gh?.title     ?? `Internal Environment: ${branch}`,
           previewLabel: `View Website Changes`,
-          author:     gh?.author    ?? 'unknown',
-          branch:     branch,
+          author:      gh?.author    ?? 'unknown',
+          branch,
           status,
-          previewUrl: status === 'Live' ? previewUrl : null,
-          namespace:  ns?.namespace  ?? `preview-env-${branch}`,
-          hasK8s:     !!ns,
-          updatedAt:  gh?.updatedAt ?? ns?.createdAt ?? new Date().toISOString(),
-          prUrl:      gh?.prUrl     ?? null,
+          previewUrl:  status === 'Live' ? previewUrl : null,
+          namespace:   ns.namespace,
+          hasK8s:      true,
+          updatedAt:   gh?.updatedAt ?? ns?.createdAt ?? new Date().toISOString(),
+          prUrl:       gh?.prUrl     ?? null,
         };
       })
     );
 
-    // Sort: Live first, then Provisioning, then Pending, then others
-    const ORDER = { Live: 0, Provisioning: 1, Pending: 2, 'Tearing Down...': 3, Destroyed: 4 };
-    entries.sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9));
+    // Filter out any Destroyed environments — their namespace was removed mid-poll
+    const active = entries.filter(e => e.status !== 'Destroyed');
 
-    res.json(entries);
+    // Sort: Live first, then Provisioning, then others
+    const ORDER = { Live: 0, Provisioning: 1, Pending: 2, 'Tearing Down...': 3 };
+    active.sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9));
+
+    res.json(active);
   } catch (err) {
     console.error('[/api/previews] Unexpected error:', err);
     res.status(500).json({ message: 'Internal server error' });
