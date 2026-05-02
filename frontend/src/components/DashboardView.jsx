@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
+import { usePreviews } from "@/hooks/usePreviews";
 
 /* ─── Inline Google Font ─────────────────────────────────────────────────── */
 const FontLink = () => (
@@ -336,44 +337,16 @@ function DeploymentCard({ d, onTeardown }) {
         {d.title}
       </div>
 
-      {/* Row 3: Author / Branch / Commit */}
+      {/* Row 3: Author / Branch */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 9, color: T.text2 }}>
           <span style={{ color: T.text1 }}>{d.author}</span>
         </span>
         <span style={{ fontSize: 9, color: T.text3 }}>·</span>
         <span style={{ fontSize: 9, color: T.violet }}>{d.branch}</span>
-        <span style={{ fontSize: 9, color: T.text3 }}>·</span>
-        <span style={{ fontSize: 9, color: T.text2 }}>
-          <span style={{ color: T.text2 }}>@</span>
-          {d.commit}
-        </span>
       </div>
 
-      {/* Row 4: CI checks */}
-      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-        <CheckPill label="build" state={d.checks.build} />
-        <CheckPill label="lint"  state={d.checks.lint}  />
-        <CheckPill label="test"  state={d.checks.test}  />
-      </div>
 
-      {/* Row 5: Resource bars (only when live) */}
-      {d.status === "Live" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 9, color: T.text2, width: 28 }}>CPU</span>
-            <div style={{ flex: 1 }}>
-              <UsageBar value={d.cpu} max={100} color={T.cyan} />
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 9, color: T.text2, width: 28 }}>MEM</span>
-            <div style={{ flex: 1 }}>
-              <UsageBar value={d.mem} max={1024} color={T.violet} />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Row 6: Actions */}
       <div style={{ display: "flex", gap: 6, alignItems: "center", paddingTop: 2 }}>
@@ -623,24 +596,42 @@ function FilterBar({ query, onQuery, filter, onFilter, total }) {
 
 /* ─── Main dashboard ─────────────────────────────────────────────────────── */
 export default function DashboardView() {
-  // — In production, replace these with: useDeployments()
-  const [deployments, setDeployments] = useState(MOCK);
-  const [lastSync, setLastSync] = useState("just now");
+  const { previews, loading, error, lastFetched, refresh } = usePreviews();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("ALL");
 
-  const handleTeardown = (id) =>
-    setDeployments(prev => prev.filter(d => d.id !== id));
+  // Format lastFetched timestamp
+  const lastSyncStr = (() => {
+    if (!lastFetched) return "never";
+    const diffMs = Date.now() - lastFetched.getTime();
+    const diffMin = Math.floor(diffMs / 60_000);
+    if (diffMin < 1) return "just now";
+    return `${diffMin}m ago`;
+  })();
+
+  const deployments = previews.map(p => ({
+    id: p.branch,
+    pr: p.prNumber || "-",
+    title: p.title,
+    author: p.author,
+    branch: p.branch,
+    status: p.status,
+    age: p.updatedAt ? "updated" : "-", 
+    namespace: p.namespace,
+    url: p.previewUrl,
+  }));
+
+  const handleTeardown = (id) => {
+    console.warn("Teardown not implemented yet for:", id);
+  };
 
   const handleRefresh = () => {
-    setLastSync("just now");
+    refresh();
   };
 
   const liveCount     = deployments.filter(d => d.status === "Live").length;
   const provCount     = deployments.filter(d => d.status === "Provisioning").length;
   const failedCount   = deployments.filter(d => d.status === "Failed").length;
-  const totalCpu      = deployments.filter(d => d.status === "Live").reduce((a, d) => a + d.cpu, 0);
-  const totalMem      = deployments.filter(d => d.status === "Live").reduce((a, d) => a + d.mem, 0);
 
   const filtered = deployments.filter(d => {
     const q = query.toLowerCase();
@@ -693,7 +684,7 @@ export default function DashboardView() {
           liveCount={liveCount}
           provCount={provCount}
           failedCount={failedCount}
-          lastSync={lastSync}
+          lastSync={lastSyncStr}
           onRefresh={handleRefresh}
         />
 
@@ -723,18 +714,6 @@ export default function DashboardView() {
               label="FAILED"
               value={failedCount}
               accent={failedCount > 0 ? T.red : T.text2}
-            />
-            <MetricTile
-              label="AVG CPU LOAD"
-              value={liveCount ? `${Math.round(totalCpu / liveCount)}%` : "—"}
-              sub="across live pods"
-              accent={T.violet}
-            />
-            <MetricTile
-              label="TOTAL MEMORY"
-              value={totalMem ? `${totalMem} MB` : "—"}
-              sub="live pods"
-              accent={T.violet}
             />
           </div>
 
