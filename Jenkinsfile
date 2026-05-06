@@ -45,7 +45,7 @@ pipeline {
                     sh "kubectl apply -f k8s/rbac.yaml"
 
                     // 3. Create the GitHub token secret (idempotent)
-                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN_VALUE')]) {
+                    withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USER', passwordVariable: 'GITHUB_TOKEN_VALUE')]) {
                         sh """
                             kubectl create secret generic bridge-api-secrets \
                               --from-literal=GITHUB_TOKEN=${GITHUB_TOKEN_VALUE} \
